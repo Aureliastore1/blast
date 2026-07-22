@@ -9,7 +9,7 @@ const envSchema = z.object({
   API_URL: z.string().default("http://localhost:4000"),
 
   DATABASE_URL: z.string(),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string(),
 
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
@@ -54,3 +54,4 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+
