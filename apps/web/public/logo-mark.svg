@@ -1,0 +1,33 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="55%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#14B8A6"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square badge -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="240" rx="112" fill="url(#glass)"/>
+
+  <!-- Message bubble -->
+  <path d="M110 176c0-33.1 26.9-60 60-60h172c33.1 0 60 26.9 60 60v92c0 33.1-26.9 60-60 60H244l-70 52v-52h-4c-33.1 0-60-26.9-60-60v-92z"
+        fill="#0F172A" fill-opacity="0.92"/>
+
+  <!-- Paper plane inside bubble -->
+  <path d="M168 222l176-54-70 176-30-70-76-52z" fill="url(#bg)"/>
+  <path d="M168 222l100 22-30 82-70-104z" fill="#ffffff" fill-opacity="0.18"/>
+
+  <!-- Lightning bolt accent, bottom-right, overlapping bubble corner -->
+  <path d="M352 270l-46 64h30l-14 56 58-70h-32z" fill="#FDE68A"/>
+
+  <!-- Signal bars, top-right of badge -->
+  <rect x="368" y="120" width="14" height="26" rx="4" fill="#ffffff" fill-opacity="0.85"/>
+  <rect x="390" y="106" width="14" height="40" rx="4" fill="#ffffff" fill-opacity="0.85"/>
+  <rect x="412" y="90" width="14" height="56" rx="4" fill="#ffffff" fill-opacity="0.85"/>
+</svg>

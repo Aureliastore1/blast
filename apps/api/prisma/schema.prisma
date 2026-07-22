@@ -1,0 +1,358 @@
+// =============================================================================
+// iNaedaa Blast — Prisma Schema
+// PostgreSQL data model for the WhatsApp Campaign Manager
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum WhatsAppStatus {
+  DISCONNECTED
+  CONNECTING
+  QR_PENDING
+  CONNECTED
+  RECONNECTING
+  LOGGED_OUT
+}
+
+enum CampaignStatus {
+  DRAFT
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum MessageStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  NONE
+}
+
+enum TemplateCategory {
+  PROMOSI
+  REMINDER
+  FOLLOW_UP
+  TAGIHAN
+  CUSTOM
+}
+
+enum DelayPreset {
+  CUSTOM
+  RANGE_1_5
+  RANGE_5_10
+  RANGE_10_20
+  RANGE_20_45
+  RANGE_45_90
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  CREATE
+  UPDATE
+  DELETE
+  CAMPAIGN_START
+  CAMPAIGN_PAUSE
+  CAMPAIGN_RESUME
+  CAMPAIGN_CANCEL
+  WHATSAPP_CONNECT
+  WHATSAPP_DISCONNECT
+  IMPORT_CONTACTS
+  EXPORT_REPORT
+}
+
+// ---------------------------------------------------------------------------
+// Core Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(USER)
+  avatarUrl     String?
+  phone         String?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  refreshTokens RefreshToken[]
+
+  whatsappSessions WhatsAppSession[]
+  campaigns        Campaign[]
+  contactLists     ContactList[]
+  mediaFiles       MediaFile[]
+  templates        Template[]
+  auditLogs        AuditLog[]
+  settings         UserSettings?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model UserSettings {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultMinDelaySec     Int      @default(5)
+  defaultMaxDelaySec     Int      @default(15)
+  maxMessagesPerHour     Int      @default(120)
+  maxRetryAttempts       Int      @default(3)
+  autoPauseFailureRate   Float    @default(0.4)
+  notifyOnComplete       Boolean  @default(true)
+  notifyOnFailureSpike   Boolean  @default(true)
+  theme                  String   @default("dark")
+  updatedAt              DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp Session
+// ---------------------------------------------------------------------------
+
+model WhatsAppSession {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionName     String         @default("default")
+  status          WhatsAppStatus @default(DISCONNECTED)
+  phoneNumber     String?
+  profileName     String?
+  profilePicUrl   String?
+  deviceInfo      String?
+  batteryLevel    Int?
+  isCharging      Boolean?
+  lastQrAt        DateTime?
+  lastConnectedAt DateTime?
+  lastSeenAt      DateTime?
+  authStatePath   String? // encrypted session credentials location on disk
+  disconnectReason String?
+
+  campaigns Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sessionName])
+  @@map("whatsapp_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Contacts
+// ---------------------------------------------------------------------------
+
+model ContactList {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  source      String? // manual | txt | csv | xlsx | pdf
+  totalCount  Int       @default(0)
+  contacts    Contact[]
+  campaigns   Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contact_lists")
+}
+
+model Contact {
+  id            String      @id @default(uuid())
+  contactListId String
+  contactList   ContactList @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  rawInput      String? // original text before normalization
+  phoneNumber   String // normalized 62xxxxxxxxxx
+  name          String?
+  isValid       Boolean     @default(true)
+  invalidReason String?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+
+  @@index([contactListId])
+  @@index([phoneNumber])
+  @@map("contacts")
+}
+
+// ---------------------------------------------------------------------------
+// Media & Templates
+// ---------------------------------------------------------------------------
+
+model MediaFile {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName     String
+  originalName String
+  mimeType     String
+  type         MediaType @default(NONE)
+  sizeBytes    Int
+  storageDriver String   @default("local") // local | supabase
+  path         String // relative path or public URL
+  thumbnailPath String?
+  campaigns    Campaign[]
+
+  createdAt DateTime @default(now())
+
+  @@map("media_files")
+}
+
+model Template {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  category    TemplateCategory @default(CUSTOM)
+  content     String           @db.Text
+  variables   String[]         @default([])
+  usageCount  Int              @default(0)
+  campaigns   Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Campaign
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id                 String          @id @default(uuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  whatsappSessionId  String?
+  whatsappSession    WhatsAppSession? @relation(fields: [whatsappSessionId], references: [id])
+  contactListId      String?
+  contactList        ContactList?    @relation(fields: [contactListId], references: [id])
+  templateId         String?
+  template           Template?       @relation(fields: [templateId], references: [id])
+  mediaFileId        String?
+  mediaFile          MediaFile?      @relation(fields: [mediaFileId], references: [id])
+
+  name        String
+  messageBody String         @db.Text
+  status      CampaignStatus @default(DRAFT)
+
+  delayPreset   DelayPreset @default(RANGE_5_10)
+  minDelaySec   Int         @default(5)
+  maxDelaySec   Int         @default(10)
+  maxPerHour    Int         @default(120)
+
+  totalContacts   Int @default(0)
+  sentCount       Int @default(0)
+  deliveredCount  Int @default(0)
+  readCount       Int @default(0)
+  failedCount     Int @default(0)
+  skippedCount    Int @default(0)
+
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  pausedAt    DateTime?
+  estimatedFinishAt DateTime?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@map("campaigns")
+}
+
+model Message {
+  id          String        @id @default(uuid())
+  campaignId  String
+  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     Contact?      @relation(fields: [contactId], references: [id])
+  phoneNumber String
+  content     String        @db.Text
+  status      MessageStatus @default(PENDING)
+  attempts    Int           @default(0)
+  errorMessage String?
+  waMessageId String?
+  queuedAt    DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId, status])
+  @@index([phoneNumber])
+  @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// Audit Log
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    AuditAction
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}

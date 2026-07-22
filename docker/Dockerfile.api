@@ -1,0 +1,41 @@
+# ---------- Build stage ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Native build deps needed by sharp / bcryptjs-style packages during npm install
+RUN apk add --no-cache python3 make g++ vips-dev
+
+# Install with full workspace context so npm resolves the monorepo correctly.
+COPY package.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+RUN npm install --no-audit --no-fund
+
+COPY packages ./packages
+COPY apps/api apps/api
+
+WORKDIR /app/apps/api
+RUN npx prisma generate
+RUN npm run build
+
+# ---------- Runtime stage ----------
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+RUN apk add --no-cache tini vips
+
+# Root node_modules (npm workspaces hoists most deps here) — Node resolves
+# modules by walking up parent directories, so this is found from apps/api too.
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+
+RUN mkdir -p apps/api/uploads apps/api/sessions
+
+WORKDIR /app/apps/api
+EXPOSE 4000
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/server.js"]
