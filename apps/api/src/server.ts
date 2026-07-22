@@ -8,6 +8,16 @@ import { startCampaignWorker } from "@/modules/queue/campaign.worker";
 import { whatsappEngine } from "@/modules/whatsapp/baileys.engine";
 
 async function bootstrap() {
+  // DEBUG: Log REDIS_URL status
+  console.log(
+    "🔍 REDIS_URL check:",
+    process.env.REDIS_URL
+      ? new URL(process.env.REDIS_URL).hostname +
+          ":" +
+          new URL(process.env.REDIS_URL).port
+      : "KOSONG/UNDEFINED"
+  );
+
   const app = createApp();
   const httpServer = createServer(app);
 
@@ -22,8 +32,12 @@ async function bootstrap() {
   logger.info("✅ Database connected");
 
   httpServer.listen(env.PORT, () => {
-    logger.info(`🚀 iNaedaa Blast API running on port ${env.PORT} [${env.NODE_ENV}]`);
-    logger.info(`📚 Swagger docs available at http://localhost:${env.PORT}/api/docs`);
+    logger.info(
+      `🚀 iNaedaa Blast API running on port ${env.PORT} [${env.NODE_ENV}]`
+    );
+    logger.info(
+      `📚 Swagger docs available at http://localhost:${env.PORT}/api/docs`
+    );
   });
 
   const shutdown = async (signal: string) => {
@@ -41,3 +55,4 @@ bootstrap().catch((err) => {
   logger.error({ err }, "Fatal error during bootstrap");
   process.exit(1);
 });
+
