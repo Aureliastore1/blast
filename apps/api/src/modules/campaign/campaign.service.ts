@@ -110,7 +110,8 @@ async function assertWhatsAppConnected(userId: string) {
 
 export async function startCampaign(userId: string, id: string) {
   const campaign = await getCampaign(userId, id);
-  if (![CampaignStatus.DRAFT, CampaignStatus.PAUSED].includes(campaign.status)) {
+  const startableStatuses: CampaignStatus[] = [CampaignStatus.DRAFT, CampaignStatus.PAUSED];
+  if (!startableStatuses.includes(campaign.status)) {
     throw AppError.badRequest(`Campaign berstatus ${campaign.status}, tidak dapat dimulai`);
   }
 
@@ -178,7 +179,12 @@ export async function pauseCampaign(userId: string, id: string) {
 
 export async function cancelCampaign(userId: string, id: string) {
   const campaign = await getCampaign(userId, id);
-  if (![CampaignStatus.RUNNING, CampaignStatus.PAUSED, CampaignStatus.QUEUED].includes(campaign.status)) {
+  const cancellableStatuses: CampaignStatus[] = [
+    CampaignStatus.RUNNING,
+    CampaignStatus.PAUSED,
+    CampaignStatus.QUEUED,
+  ];
+  if (!cancellableStatuses.includes(campaign.status)) {
     throw AppError.badRequest("Campaign tidak dapat dibatalkan pada status ini");
   }
 

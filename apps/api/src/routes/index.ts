@@ -8,7 +8,7 @@ import templateRoutes from "@/modules/template/template.routes";
 import historyRoutes from "@/modules/history/history.routes";
 import reportRoutes from "@/modules/report/report.routes";
 import settingsRoutes from "@/modules/settings/settings.routes";
-import { generateCsrfToken } from "@/middleware/csrf";
+import { generateToken } from "@/middleware/csrf";
 
 const router = Router();
 
@@ -22,7 +22,7 @@ const router = Router();
  *       200: { description: CSRF token issued }
  */
 router.get("/csrf-token", (req, res) => {
-  const token = generateCsrfToken(req, res);
+  const token = generateToken(req, res);
   res.json({ success: true, data: { csrfToken: token } });
 });
 
