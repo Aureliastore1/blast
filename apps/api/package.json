@@ -6,7 +6,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --require tsconfig-paths/register src/server.ts",
-    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "prisma generate && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "postinstall": "prisma generate",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
