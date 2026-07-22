@@ -110,14 +110,9 @@ async function assertWhatsAppConnected(userId: string) {
 
 export async function startCampaign(userId: string, id: string) {
   const campaign = await getCampaign(userId, id);
-  if (
-  campaign.status !== CampaignStatus.DRAFT &&
-  campaign.status !== CampaignStatus.PAUSED
-) {
-  throw AppError.badRequest(
-    `Campaign berstatus ${campaign.status}, tidak dapat dimulai`
-  );
-}
+  if (![CampaignStatus.DRAFT, CampaignStatus.PAUSED].includes(campaign.status)) {
+    throw AppError.badRequest(`Campaign berstatus ${campaign.status}, tidak dapat dimulai`);
+  }
 
   await assertWhatsAppConnected(userId);
 
@@ -183,15 +178,9 @@ export async function pauseCampaign(userId: string, id: string) {
 
 export async function cancelCampaign(userId: string, id: string) {
   const campaign = await getCampaign(userId, id);
-  if (
-  campaign.status !== CampaignStatus.RUNNING &&
-  campaign.status !== CampaignStatus.PAUSED &&
-  campaign.status !== CampaignStatus.QUEUED
-) {
-  throw AppError.badRequest(
-    "Campaign tidak dapat dibatalkan pada status ini"
-  );
-}
+  if (![CampaignStatus.RUNNING, CampaignStatus.PAUSED, CampaignStatus.QUEUED].includes(campaign.status)) {
+    throw AppError.badRequest("Campaign tidak dapat dibatalkan pada status ini");
+  }
 
   await prisma.campaign.update({ where: { id }, data: { status: CampaignStatus.CANCELLED, finishedAt: new Date() } });
   await drainCampaignJobs(id);
