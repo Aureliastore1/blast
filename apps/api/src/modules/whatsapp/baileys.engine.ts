@@ -1,30 +1,30 @@
-import path from "path";
-import fs from "fs";
-import qrcode from "qrcode";
+import path from \"path\";
+import fs from \"fs\";
+import qrcode from \"qrcode\";
 import makeWASocket, {
   DisconnectReason,
   WASocket,
   Browsers,
   ConnectionState,
   downloadMediaMessage,
-} from "@whiskeysockets/baileys";
-import type { Boom } from "@hapi/boom";
-import { Server as SocketIOServer } from "socket.io";
-import { env } from "@/config/env";
-import { logger } from "@/config/logger";
-import { prisma } from "@/config/prisma";
-import { useEncryptedAuthState, wipeAuthState } from "./authState";
-import { emitWhatsAppStatus, emitNotification } from "@/sockets";
+} from \"@whiskeysockets/baileys\";
+import type { Boom } from \"@hapi/boom\";
+import { Server as SocketIOServer } from \"socket.io\";
+import { env } from \"@/config/env\";
+import { logger } from \"@/config/logger\";
+import { prisma } from \"@/config/prisma\";
+import { useEncryptedAuthState, wipeAuthState } from \"./authState\";
+import { emitWhatsAppStatus, emitNotification } from \"@/sockets\";
 import {
   IWhatsAppEngine,
   SendMessageInput,
   SendMessageResult,
   WhatsAppStatusPayload,
-} from "./whatsapp.types";
+} from \"./whatsapp.types\";
 
 interface ActiveSession {
   socket: WASocket;
-  status: WhatsAppStatusPayload["status"];
+  status: WhatsAppStatusPayload[\"status\"];
 }
 
 const RECONNECT_DELAY_MS = 4000;
@@ -38,41 +38,80 @@ class BaileysWhatsAppEngine implements IWhatsAppEngine {
   }
 
   isConnected(userId: string): boolean {
-    return this.sessions.get(userId)?.status === "CONNECTED";
+    return this.sessions.get(userId)?.status === \"CONNECTED\";
   }
 
   getActiveSocket(userId: string): WASocket | undefined {
     const session = this.sessions.get(userId);
-    return session?.status === "CONNECTED" ? session.socket : undefined;
+    return session?.status === \"CONNECTED\" ? session.socket : undefined;
   }
 
   private sessionFolder(userId: string) {
     return path.resolve(env.WA_SESSION_DIR, userId);
   }
 
+  /**
+   * Get proxy agent configuration for bypassing WhatsApp anti-bot protection.
+   * Supports HTTP_PROXY, HTTPS_PROXY, SOCKS_PROXY environment variables.
+   * Usage: set WA_PROXY=http://user:pass@proxy.host:8080 or socks5://proxy.host:1080
+   */
+  private getProxyAgent() {
+    const proxyUrl = process.env.WA_PROXY || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+    
+    if (!proxyUrl) {
+      logger.info(\"WhatsApp: No proxy configured. Using direct connection.\");
+      return undefined;
+    }
+
+    try {
+      if (proxyUrl.startsWith(\"socks5://\") || proxyUrl.startsWith(\"socks4://\")) {
+        // For SOCKS proxy, we'll pass the URL as-is and Baileys will handle it
+        logger.info({ proxy: proxyUrl }, \"WhatsApp: Using SOCKS proxy to bypass anti-bot\");
+        return proxyUrl;
+      } else if (proxyUrl.startsWith(\"http://\") || proxyUrl.startsWith(\"https://\")) {
+        logger.info({ proxy: proxyUrl.replace(/:[^:]*@/, \":***@\") }, \"WhatsApp: Using HTTP proxy to bypass anti-bot\");
+        return proxyUrl;
+      }
+    } catch (err) {
+      logger.warn({ err, proxy: proxyUrl }, \"Failed to parse proxy URL, ignoring\");
+    }
+
+    return undefined;
+  }
+
   async startSession(userId: string): Promise<void> {
     const existing = this.sessions.get(userId);
-    if (existing && (existing.status === "CONNECTED" || existing.status === "CONNECTING")) {
+    if (existing && (existing.status === \"CONNECTED\" || existing.status === \"CONNECTING\")) {
       return; // already connecting/connected — no-op
     }
 
     const folder = this.sessionFolder(userId);
     const { state, saveCreds } = await useEncryptedAuthState(folder);
 
-    const socket = makeWASocket({
+    const proxyUrl = this.getProxyAgent();
+    const socketConfig: any = {
       auth: state,
-      browser: Browsers.appropriate("Chrome"),
+      browser: Browsers.appropriate(\"Chrome\"),
       syncFullHistory: false,
       markOnlineOnConnect: false,
-    });
+    };
 
-    this.sessions.set(userId, { socket, status: "CONNECTING" });
-    await this.persistStatus(userId, "CONNECTING");
+    // Add proxy configuration if available
+    if (proxyUrl) {
+      socketConfig.agent = proxyUrl;
+      socketConfig.proxy = proxyUrl;
+      socketConfig.fetchAgent = proxyUrl;
+    }
 
-    socket.ev.on("creds.update", saveCreds);
-    socket.ev.on("connection.update", (update) => {
+    const socket = makeWASocket(socketConfig);
+
+    this.sessions.set(userId, { socket, status: \"CONNECTING\" });
+    await this.persistStatus(userId, \"CONNECTING\");
+
+    socket.ev.on(\"creds.update\", saveCreds);
+    socket.ev.on(\"connection.update\", (update) => {
       this.handleConnectionUpdate(userId, update).catch((err) =>
-        logger.error({ err, userId }, "Error handling WA connection update")
+        logger.error({ err, userId }, \"Error handling WA connection update\")
       );
     });
   }
@@ -83,46 +122,46 @@ class BaileysWhatsAppEngine implements IWhatsAppEngine {
 
     if (qr) {
       const qrDataUrl = await qrcode.toDataURL(qr, { margin: 1, width: 320 });
-      if (session) session.status = "QR_PENDING";
-      await this.persistStatus(userId, "QR_PENDING", { lastQrAt: new Date() });
-      this.broadcastStatus(userId, { status: "QR_PENDING", qr: qrDataUrl });
+      if (session) session.status = \"QR_PENDING\";
+      await this.persistStatus(userId, \"QR_PENDING\", { lastQrAt: new Date() });
+      this.broadcastStatus(userId, { status: \"QR_PENDING\", qr: qrDataUrl });
     }
 
-    if (connection === "open") {
+    if (connection === \"open\") {
       const me = session?.socket.user;
-      const phoneNumber = me?.id?.split(":")[0]?.split("@")[0];
-      if (session) session.status = "CONNECTED";
+      const phoneNumber = me?.id?.split(\":\")[0]?.split(\"@\")[0];
+      if (session) session.status = \"CONNECTED\";
 
-      await this.persistStatus(userId, "CONNECTED", {
+      await this.persistStatus(userId, \"CONNECTED\", {
         phoneNumber,
         profileName: me?.name ?? undefined,
         lastConnectedAt: new Date(),
         disconnectReason: null,
       });
-      this.broadcastStatus(userId, { status: "CONNECTED", phoneNumber, profileName: me?.name });
-      this.notify(userId, "success", "WhatsApp Terhubung", `Nomor ${phoneNumber ?? ""} berhasil tersambung.`);
+      this.broadcastStatus(userId, { status: \"CONNECTED\", phoneNumber, profileName: me?.name });
+      this.notify(userId, \"success\", \"WhatsApp Terhubung\", `Nomor ${phoneNumber ?? \"\"} berhasil tersambung.`);
     }
 
-    if (connection === "close") {
+    if (connection === \"close\") {
       const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
-      const reason = lastDisconnect?.error?.message ?? "unknown";
+      const reason = lastDisconnect?.error?.message ?? \"unknown\";
 
       this.sessions.delete(userId);
 
-      await this.persistStatus(userId, loggedOut ? "LOGGED_OUT" : "DISCONNECTED", {
+      await this.persistStatus(userId, loggedOut ? \"LOGGED_OUT\" : \"DISCONNECTED\", {
         disconnectReason: reason,
       });
-      this.broadcastStatus(userId, { status: loggedOut ? "LOGGED_OUT" : "DISCONNECTED" });
+      this.broadcastStatus(userId, { status: loggedOut ? \"LOGGED_OUT\" : \"DISCONNECTED\" });
 
       if (loggedOut) {
         await wipeAuthState(this.sessionFolder(userId));
-        this.notify(userId, "error", "WhatsApp Logout", "Perangkat logout. Silakan pindai ulang QR Code.");
+        this.notify(userId, \"error\", \"WhatsApp Logout\", \"Perangkat logout. Silakan pindai ulang QR Code.\");
       } else {
-        this.notify(userId, "warning", "WhatsApp Terputus", "Koneksi terputus, mencoba menyambung ulang...");
+        this.notify(userId, \"warning\", \"WhatsApp Terputus\", \"Koneksi terputus, mencoba menyambung ulang...\");
         setTimeout(() => {
           this.startSession(userId).catch((err) =>
-            logger.error({ err, userId }, "Auto-reconnect failed")
+            logger.error({ err, userId }, \"Auto-reconnect failed\")
           );
         }, RECONNECT_DELAY_MS);
       }
@@ -135,19 +174,19 @@ class BaileysWhatsAppEngine implements IWhatsAppEngine {
       try {
         await session.socket.logout();
       } catch (err) {
-        logger.warn({ err, userId }, "Error during explicit WA logout, forcing local cleanup");
+        logger.warn({ err, userId }, \"Error during explicit WA logout, forcing local cleanup\");
       }
       this.sessions.delete(userId);
     }
     await wipeAuthState(this.sessionFolder(userId));
-    await this.persistStatus(userId, "DISCONNECTED", { disconnectReason: "user_logout" });
-    this.broadcastStatus(userId, { status: "DISCONNECTED" });
+    await this.persistStatus(userId, \"DISCONNECTED\", { disconnectReason: \"user_logout\" });
+    this.broadcastStatus(userId, { status: \"DISCONNECTED\" });
   }
 
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     const socket = this.getActiveSocket(input.userId);
     if (!socket) {
-      return { success: false, error: "WhatsApp tidak terhubung untuk user ini" };
+      return { success: false, error: \"WhatsApp tidak terhubung untuk user ini\" };
     }
 
     const jid = `${input.to}@s.whatsapp.net`;
@@ -156,38 +195,38 @@ class BaileysWhatsAppEngine implements IWhatsAppEngine {
       let result;
       if (input.mediaPath && input.mediaType) {
         const buffer = await fs.promises.readFile(input.mediaPath);
-        if (input.mediaType === "IMAGE") {
+        if (input.mediaType === \"IMAGE\") {
           result = await socket.sendMessage(jid, { image: buffer, caption: input.caption ?? input.text });
-        } else if (input.mediaType === "VIDEO") {
+        } else if (input.mediaType === \"VIDEO\") {
           result = await socket.sendMessage(jid, { video: buffer, caption: input.caption ?? input.text });
         } else {
           result = await socket.sendMessage(jid, {
             document: buffer,
-            mimetype: "application/octet-stream",
+            mimetype: \"application/octet-stream\",
             fileName: path.basename(input.mediaPath),
             caption: input.caption ?? input.text,
           });
         }
       } else {
-        result = await socket.sendMessage(jid, { text: input.text ?? "" });
+        result = await socket.sendMessage(jid, { text: input.text ?? \"\" });
       }
 
       return { success: true, waMessageId: result?.key?.id ?? undefined };
     } catch (err) {
-      logger.error({ err, userId: input.userId, to: input.to }, "Failed to send WhatsApp message");
-      return { success: false, error: err instanceof Error ? err.message : "Unknown send error" };
+      logger.error({ err, userId: input.userId, to: input.to }, \"Failed to send WhatsApp message\");
+      return { success: false, error: err instanceof Error ? err.message : \"Unknown send error\" };
     }
   }
 
   private async persistStatus(
     userId: string,
-    status: WhatsAppStatusPayload["status"],
+    status: WhatsAppStatusPayload[\"status\"],
     extra: Record<string, unknown> = {}
   ) {
     await prisma.whatsAppSession.upsert({
-      where: { userId_sessionName: { userId, sessionName: "default" } },
+      where: { userId_sessionName: { userId, sessionName: \"default\" } },
       update: { status, ...extra },
-      create: { userId, sessionName: "default", status, ...extra },
+      create: { userId, sessionName: \"default\", status, ...extra },
     });
   }
 
@@ -197,7 +236,7 @@ class BaileysWhatsAppEngine implements IWhatsAppEngine {
 
   private notify(
     userId: string,
-    type: "success" | "error" | "warning" | "info",
+    type: \"success\" | \"error\" | \"warning\" | \"info\",
     title: string,
     message: string
   ) {
@@ -211,3 +250,4 @@ export const whatsappEngine = new BaileysWhatsAppEngine();
 // Re-exported for modules that only need type-checked access to raw media download,
 // used by potential future inbound-message features.
 export { downloadMediaMessage };
+
