@@ -10,6 +10,10 @@ export interface CampaignJobData {
   mediaPath?: string;
   mediaType?: "IMAGE" | "VIDEO" | "DOCUMENT";
   attempt: number;
+  // Cloud API template mode
+  templateName?: string;
+  templateLanguage?: string;
+  templateParams?: Record<string, string>;
 }
 
 export const CAMPAIGN_QUEUE_NAME = "campaign-send-queue";
@@ -39,3 +43,4 @@ export async function drainCampaignJobs(campaignId: string) {
       .map((job) => job.remove().catch(() => undefined))
   );
 }
+

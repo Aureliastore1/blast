@@ -6,7 +6,7 @@ import { logger } from "@/config/logger";
 import { prisma } from "@/config/prisma";
 import { initSocket } from "@/sockets";
 import { startCampaignWorker } from "@/modules/queue/campaign.worker";
-import { whatsappEngine } from "@/modules/whatsapp/baileys.engine";
+import { whatsappEngine } from "@/modules/whatsapp/cloudapi.engine";
 
 async function bootstrap() {
   const app = createApp();
@@ -25,6 +25,7 @@ async function bootstrap() {
   httpServer.listen(env.PORT, () => {
     logger.info(`🚀 iNaedaa Blast API running on port ${env.PORT} [${env.NODE_ENV}]`);
     logger.info(`📚 Swagger docs available at http://localhost:${env.PORT}/api/docs`);
+    logger.info(`📡 WhatsApp webhook: POST /api/v1/whatsapp/webhook`);
   });
 
   const shutdown = async (signal: string) => {

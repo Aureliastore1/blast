@@ -12,6 +12,10 @@ export interface SendMessageInput {
   mediaPath?: string;
   mediaType?: "IMAGE" | "VIDEO" | "DOCUMENT";
   caption?: string;
+  // Cloud API template mode
+  templateName?: string;
+  templateLanguage?: string; // e.g., "id" for Indonesian
+  templateParams?: Record<string, string>;
 }
 
 export interface SendMessageResult {
@@ -33,3 +37,4 @@ export interface IWhatsAppEngine {
   isConnected(userId: string): boolean;
   sendMessage(input: SendMessageInput): Promise<SendMessageResult>;
 }
+

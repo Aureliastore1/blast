@@ -5,7 +5,7 @@ import { redisConnection } from "@/config/redis";
 import { prisma } from "@/config/prisma";
 import { env } from "@/config/env";
 import { logger } from "@/config/logger";
-import { whatsappEngine } from "@/modules/whatsapp/baileys.engine";
+import { whatsappEngine } from "@/modules/whatsapp/cloudapi.engine";
 import { emitCampaignProgress, emitNotification } from "@/sockets";
 import { CAMPAIGN_QUEUE_NAME, CampaignJobData, enqueueMessage } from "./campaign.queue";
 
@@ -32,7 +32,19 @@ export function startCampaignWorker(io: SocketIOServer) {
 }
 
 async function processJob(job: Job<CampaignJobData>, io: SocketIOServer) {
-  const { campaignId, messageId, userId, phoneNumber, content, mediaPath, mediaType, attempt } = job.data;
+  const {
+    campaignId,
+    messageId,
+    userId,
+    phoneNumber,
+    content,
+    mediaPath,
+    mediaType,
+    attempt,
+    templateName,
+    templateLanguage,
+    templateParams,
+  } = job.data;
 
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) return;
@@ -53,10 +65,16 @@ async function processJob(job: Job<CampaignJobData>, io: SocketIOServer) {
     data: { status: MessageStatus.SENDING, attempts: attempt },
   });
 
+  // Use template mode if provided (for new contacts), otherwise free text (for replies)
   const result = await whatsappEngine.sendMessage({
     userId,
     to: phoneNumber,
-    text: content,
+    ...(templateName && {
+      templateName,
+      templateLanguage: templateLanguage || "id",
+      templateParams,
+    }),
+    ...(!templateName && { text: content }),
     mediaPath,
     mediaType,
   });
@@ -75,7 +93,13 @@ async function processJob(job: Job<CampaignJobData>, io: SocketIOServer) {
         where: { id: messageId },
         data: { status: MessageStatus.PENDING, errorMessage: result.error },
       });
-      await enqueueMessage({ ...job.data, attempt: attempt + 1 }, backoffDelayMs(attempt + 1));
+      await enqueueMessage(
+        {
+          ...job.data,
+          attempt: attempt + 1,
+        },
+        backoffDelayMs(attempt + 1)
+      );
     } else {
       await prisma.message.update({
         where: { id: messageId },
@@ -152,3 +176,4 @@ export async function evaluateCampaignProgress(campaignId: string, io: SocketIOS
 
   if (notify) emitNotification(io, campaign.userId, notify);
 }
+

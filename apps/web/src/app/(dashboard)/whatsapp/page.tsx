@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { QrCode, Smartphone, RefreshCcw, LogOut, CheckCircle2, Loader2 } from "lucide-react";
+import { Smartphone, CheckCircle2, Info } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -12,144 +11,129 @@ import { apiClient, apiErrorMessage } from "@/lib/apiClient";
 import { useWAStore } from "@/store/waStore";
 
 export default function WhatsAppConnectPage() {
-  const { status, qr, phoneNumber, profileName, setStatus } = useWAStore();
-  const [connecting, setConnecting] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { status, phoneNumber, profileName, setStatus } = useWAStore();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiClient
       .get("/whatsapp/status")
       .then((res) => setStatus(res.data.data))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
   }, [setStatus]);
-
-  async function handleConnect() {
-    setConnecting(true);
-    try {
-      await apiClient.post("/whatsapp/connect");
-      toast.success("Memulai koneksi... tunggu QR Code muncul");
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await apiClient.post("/whatsapp/logout");
-      toast.success("Berhasil logout dari WhatsApp");
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    } finally {
-      setLoggingOut(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Koneksi WhatsApp</h1>
-        <p className="text-sm text-slate-500">Hubungkan akun WhatsApp Anda dengan memindai QR Code, seperti WhatsApp Web.</p>
+        <h1 className="text-xl font-bold text-white">Koneksi WhatsApp Business Cloud API</h1>
+        <p className="text-sm text-slate-500">
+          Aplikasi ini menggunakan WhatsApp Business Cloud API dari Meta. Nomor bisnis tersambung secara permanen melalui kredensial API yang sudah dikonfigurasi.
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Status Perangkat</CardTitle>
+          <CardTitle>Status Koneksi</CardTitle>
           <StatusBadge status={status} />
         </CardHeader>
 
-        <div className="flex flex-col items-center gap-6 py-4">
+        <div className="flex flex-col items-center gap-6 py-8">
           <AnimatePresence mode="wait">
-            {status === "CONNECTED" ? (
+            {!loading && status === "CONNECTED" ? (
               <motion.div
                 key="connected"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="flex flex-col items-center gap-3 text-center"
+                className="flex flex-col items-center gap-4 text-center"
               >
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent-green/10 ring-4 ring-accent-green/20">
-                  <CheckCircle2 className="h-12 w-12 text-accent-green" />
+                <div className="flex h-28 w-28 items-center justify-center rounded-full bg-accent-green/10 ring-4 ring-accent-green/20">
+                  <CheckCircle2 className="h-14 w-14 text-accent-green" />
                 </div>
                 <div>
-                  <p className="font-semibold text-white">{profileName ?? "WhatsApp Terhubung"}</p>
-                  <p className="text-sm text-slate-500">+{phoneNumber}</p>
+                  <p className="text-lg font-semibold text-white">WhatsApp Siap Digunakan</p>
+                  <p className="text-sm text-slate-500 mt-2">
+                    {profileName || "WhatsApp Cloud API"} — Nomor Bisnis
+                  </p>
+                  {phoneNumber && (
+                    <p className="text-xs text-slate-400 mt-1">ID: {phoneNumber}</p>
+                  )}
                 </div>
-              </motion.div>
-            ) : qr ? (
-              <motion.div
-                key="qr"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center gap-3"
-              >
-                <div className="rounded-2xl bg-white p-4 shadow-glow">
-                  <Image src={qr} alt="WhatsApp QR Code" width={260} height={260} unoptimized />
-                </div>
-                <p className="max-w-xs text-center text-xs text-slate-500">
-                  Buka WhatsApp di HP Anda → Perangkat Tertaut → Tautkan Perangkat, lalu pindai kode ini.
-                </p>
               </motion.div>
             ) : (
               <motion.div
-                key="idle"
+                key="loading"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-3 text-center"
+                className="flex flex-col items-center gap-4 text-center"
               >
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/5 ring-1 ring-inset ring-white/10">
-                  {status === "CONNECTING" || status === "RECONNECTING" ? (
-                    <Loader2 className="h-10 w-10 animate-spin text-accent-cyan" />
-                  ) : (
-                    <QrCode className="h-10 w-10 text-slate-500" />
-                  )}
+                <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white/5 ring-1 ring-inset ring-white/10">
+                  <div className="animate-pulse">
+                    <CheckCircle2 className="h-14 w-14 text-slate-600" />
+                  </div>
                 </div>
-                <p className="text-sm text-slate-500">
-                  {status === "CONNECTING" || status === "RECONNECTING"
-                    ? "Sedang menyiapkan sesi..."
-                    : "Belum ada koneksi aktif"}
-                </p>
+                <p className="text-sm text-slate-500">Memeriksa status koneksi...</p>
               </motion.div>
             )}
           </AnimatePresence>
-
-          <div className="flex gap-3">
-            {status === "CONNECTED" ? (
-              <Button variant="danger" onClick={handleLogout} loading={loggingOut}>
-                <LogOut className="h-4 w-4" /> Logout Perangkat
-              </Button>
-            ) : (
-              <Button onClick={handleConnect} loading={connecting}>
-                <RefreshCcw className="h-4 w-4" /> {qr ? "Muat Ulang QR" : "Hubungkan WhatsApp"}
-              </Button>
-            )}
-          </div>
         </div>
       </Card>
 
-      {status === "CONNECTED" && (
+      {!loading && status === "CONNECTED" && (
         <Card>
           <CardHeader>
-            <CardTitle>Info Perangkat</CardTitle>
+            <CardTitle>Informasi Koneksi</CardTitle>
           </CardHeader>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <InfoRow icon={Smartphone} label="Nomor" value={phoneNumber ? `+${phoneNumber}` : "-"} />
-            <InfoRow icon={CheckCircle2} label="Nama Akun" value={profileName ?? "-"} />
+          <div className="grid grid-cols-1 gap-4 text-sm">
+            <InfoRow 
+              icon={Smartphone} 
+              label="Tipe Koneksi" 
+              value="WhatsApp Cloud API (Permanent)" 
+            />
+            <InfoRow 
+              icon={CheckCircle2} 
+              label="Profil" 
+              value={profileName || "Cloud API"} 
+            />
+            {phoneNumber && (
+              <InfoRow 
+                icon={Smartphone} 
+                label="Nomor Bisnis ID" 
+                value={phoneNumber} 
+              />
+            )}
           </div>
         </Card>
       )}
 
-      <Card className="border-amber-500/20 bg-amber-500/[0.03]">
-        <p className="text-xs leading-relaxed text-amber-200/80">
-          <strong>Catatan keamanan:</strong> iNaedaa Blast tidak dapat menjamin akun Anda kebal dari pembatasan
-          WhatsApp. Sistem menerapkan praktik terbaik (delay acak, batas pesan/jam, retry bertahap, auto-pause saat
-          kegagalan tinggi) untuk memperkecil risiko, namun kebijakan akhir tetap berada di tangan WhatsApp.
-        </p>
+      <Card className="border-blue-500/20 bg-blue-500/[0.03]">
+        <div className="flex gap-3">
+          <Info className="h-5 w-5 flex-shrink-0 text-blue-400 mt-0.5" />
+          <div className="space-y-2 text-xs leading-relaxed text-blue-200/80">
+            <p>
+              <strong>Cloud API Mode:</strong> Nomor bisnis WhatsApp Anda tersambung secara permanen melalui API resmi dari Meta. Tidak perlu scan QR Code lagi.
+            </p>
+            <p>
+              <strong>Kepatuhan Meta:</strong> Sistem menerapkan praktik terbaik (delay acak, batas pesan/jam, retry bertahap) sesuai panduan WhatsApp Business Platform untuk menjaga kesehatan akun.
+            </p>
+            <p>
+              <strong>Template Messages:</strong> Pesan ke kontak baru dikirim menggunakan template WhatsApp yang sudah disetujui Meta untuk mencegah spam classification.
+            </p>
+          </div>
+        </div>
       </Card>
+
+      {!loading && status === "CONNECTED" && (
+        <Card className="border-accent-green/20 bg-accent-green/[0.03]">
+          <div className="flex gap-3">
+            <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-accent-green mt-0.5" />
+            <p className="text-xs leading-relaxed text-accent-green/80">
+              <strong>Status Aktif:</strong> Nomor bisnis siap menerima dan mengirim pesan. Anda dapat langsung membuat dan menjalankan campaign broadcast.
+            </p>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -165,3 +149,4 @@ function InfoRow({ icon: Icon, label, value }: { icon: typeof Smartphone; label:
     </div>
   );
 }
+

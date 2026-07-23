@@ -31,9 +31,16 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
   SUPABASE_BUCKET: z.string().optional().default("inaedaa-media"),
 
-  WA_ENGINE: z.string().default("baileys"),
+  WA_ENGINE: z.string().default("cloudapi"),
   WA_SESSION_DIR: z.string().default("./sessions"),
   WA_MAX_SESSIONS: z.coerce.number().default(5),
+
+  // WhatsApp Cloud API credentials
+  WHATSAPP_CLOUD_API_TOKEN: z.string(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string(),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z.string(),
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string(),
+  WHATSAPP_API_VERSION: z.string().default("v21.0"),
 
   QUEUE_CONCURRENCY: z.coerce.number().default(1),
   DEFAULT_MIN_DELAY_SEC: z.coerce.number().default(5),
