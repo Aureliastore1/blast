@@ -6,7 +6,11 @@ export async function connect(req: Request, res: Response) {
   const userId = req.user!.sub;
   const result = await whatsappService.requestConnection(userId);
   await recordAudit({ userId, action: "WHATSAPP_CONNECT", req });
-  res.json({ success: true, data: result, message: "Memulai koneksi WhatsApp, pindai QR Code." });
+  res.json({
+    success: true,
+    data: result,
+    message: "WhatsApp Cloud API sudah tersambung (credentials sudah dikonfigurasi).",
+  });
 }
 
 export async function status(req: Request, res: Response) {
@@ -18,5 +22,10 @@ export async function logout(req: Request, res: Response) {
   const userId = req.user!.sub;
   const result = await whatsappService.disconnectSession(userId);
   await recordAudit({ userId, action: "WHATSAPP_DISCONNECT", req });
-  res.json({ success: true, data: result, message: "Perangkat WhatsApp berhasil di-logout." });
+  res.json({
+    success: true,
+    data: result,
+    message: "Session status diperbarui.",
+  });
 }
+

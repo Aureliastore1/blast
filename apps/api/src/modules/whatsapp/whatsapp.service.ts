@@ -1,5 +1,5 @@
 import { prisma } from "@/config/prisma";
-import { whatsappEngine } from "./baileys.engine";
+import { whatsappEngine } from "./cloudapi.engine";
 import { AppError } from "@/utils/AppError";
 
 export async function requestConnection(userId: string) {
@@ -36,3 +36,4 @@ export async function disconnectSession(userId: string) {
   await whatsappEngine.logoutSession(userId);
   return { success: true };
 }
+

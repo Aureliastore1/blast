@@ -2,7 +2,7 @@ import { CampaignStatus, MessageStatus } from "@prisma/client";
 import { prisma } from "@/config/prisma";
 import { AppError } from "@/utils/AppError";
 import { renderTemplate } from "@/modules/template/template.service";
-import { whatsappEngine } from "@/modules/whatsapp/baileys.engine";
+import { whatsappEngine } from "@/modules/whatsapp/cloudapi.engine";
 import { enqueueMessage, drainCampaignJobs } from "@/modules/queue/campaign.queue";
 import { buildDelaySchedule, DELAY_PRESET_RANGES } from "@/modules/queue/scheduler";
 import { CreateCampaignInput } from "./campaign.schema";
@@ -104,7 +104,9 @@ export async function getCampaign(userId: string, id: string) {
 
 async function assertWhatsAppConnected(userId: string) {
   if (!whatsappEngine.isConnected(userId)) {
-    throw AppError.badRequest("WhatsApp belum terhubung. Hubungkan WhatsApp terlebih dahulu sebelum menjalankan campaign.");
+    throw AppError.badRequest(
+      "WhatsApp Cloud API tidak tersambung. Pastikan WHATSAPP_CLOUD_API_TOKEN dan kredensial lainnya sudah dikonfigurasi."
+    );
   }
 }
 
@@ -126,13 +128,24 @@ export async function startCampaign(userId: string, id: string) {
     throw AppError.badRequest("Tidak ada pesan tersisa untuk dikirim pada campaign ini");
   }
 
-  const schedule = buildDelaySchedule(pendingMessages.length, campaign.minDelaySec, campaign.maxDelaySec, campaign.maxPerHour);
+  const schedule = buildDelaySchedule(
+    pendingMessages.length,
+    campaign.minDelaySec,
+    campaign.maxDelaySec,
+    campaign.maxPerHour
+  );
 
   const mediaPath = campaign.mediaFile
     ? path.resolve(env.UPLOAD_DIR, path.basename(campaign.mediaFile.path))
     : undefined;
   const mediaType =
     campaign.mediaFile && campaign.mediaFile.type !== "NONE" ? campaign.mediaFile.type : undefined;
+
+  // Template mode: use WhatsApp template for new contacts (cold outreach)
+  // For now, default template is "bag" (Indonesian marketing template)
+  const templateName = "bag";
+  const templateLanguage = "id";
+  const templateParams: Record<string, string> = {};
 
   await Promise.all(
     pendingMessages.map((message, idx) =>
@@ -146,6 +159,10 @@ export async function startCampaign(userId: string, id: string) {
           mediaPath: mediaPath as string | undefined,
           mediaType: mediaType as "IMAGE" | "VIDEO" | "DOCUMENT" | undefined,
           attempt: message.attempts + 1,
+          // Cloud API template mode
+          templateName,
+          templateLanguage,
+          templateParams,
         },
         schedule[idx]
       )
@@ -216,3 +233,4 @@ export async function getCampaignProgress(userId: string, id: string) {
     estimatedFinishAt: campaign.estimatedFinishAt,
   };
 }
+

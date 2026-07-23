@@ -3,9 +3,19 @@ import { requireAuth } from "@/middleware/auth";
 import { whatsappActionLimiter } from "@/middleware/rateLimiter";
 import { asyncHandler } from "@/utils/asyncHandler";
 import * as whatsappController from "./whatsapp.controller";
+import * as whatsappWebhook from "./whatsapp.webhook";
 
 const router = Router();
 
+/**
+ * PUBLIC webhook routes (no auth required)
+ */
+router.get("/webhook", asyncHandler(whatsappWebhook.verifyWebhook));
+router.post("/webhook", asyncHandler(whatsappWebhook.handleWebhook));
+
+/**
+ * PROTECTED routes (require authentication)
+ */
 router.use(requireAuth);
 
 /**
@@ -13,11 +23,11 @@ router.use(requireAuth);
  * /whatsapp/connect:
  *   post:
  *     tags: [WhatsApp Session]
- *     summary: Start a new WhatsApp QR session for the current user
+ *     summary: Initialize Cloud API connection (always connected via credentials)
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
- *         description: Session initiated — listen on Socket.io event `whatsapp:status` for the QR code
+ *         description: Cloud API status retrieved
  */
 router.post("/connect", whatsappActionLimiter, asyncHandler(whatsappController.connect));
 
@@ -26,7 +36,7 @@ router.post("/connect", whatsappActionLimiter, asyncHandler(whatsappController.c
  * /whatsapp/status:
  *   get:
  *     tags: [WhatsApp Session]
- *     summary: Get the current WhatsApp connection status
+ *     summary: Get the current WhatsApp Cloud API connection status
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: Current connection status }
@@ -38,7 +48,7 @@ router.get("/status", asyncHandler(whatsappController.status));
  * /whatsapp/logout:
  *   post:
  *     tags: [WhatsApp Session]
- *     summary: Logout the connected WhatsApp device and wipe local session
+ *     summary: Logout Cloud API (no-op, credentials managed globally)
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: Logged out }
@@ -46,3 +56,4 @@ router.get("/status", asyncHandler(whatsappController.status));
 router.post("/logout", asyncHandler(whatsappController.logout));
 
 export default router;
+
