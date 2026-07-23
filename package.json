@@ -8,14 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n API,WEB -c cyan,magenta \"pnpm run dev -w apps/api\" \"pnpm run dev -w apps/web\"",
-    "build": "pnpm run build -w apps/api && pnpm run build -w apps/web",
-    "start": "concurrently -k -n API,WEB -c cyan,magenta \"pnpm run start -w apps/api\" \"pnpm run start -w apps/web\"",
-    "prisma:generate": "pnpm run prisma:generate -w apps/api",
-    "prisma:migrate": "pnpm run prisma:migrate -w apps/api",
-    "prisma:seed": "pnpm run prisma:seed -w apps/api",
-    "test": "pnpm run test -w apps/api",
-    "lint": "pnpm run lint -w apps/api && pnpm run lint -w apps/web"
+    "dev": "concurrently -k -n API,WEB -c cyan,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "start": "concurrently -k -n API,WEB -c cyan,magenta \"npm run start -w apps/api\" \"npm run start -w apps/web\"",
+    "prisma:generate": "npm run prisma:generate -w apps/api",
+    "prisma:migrate": "npm run prisma:migrate -w apps/api",
+    "prisma:seed": "npm run prisma:seed -w apps/api",
+    "test": "npm run test -w apps/api",
+    "lint": "npm run lint -w apps/api && npm run lint -w apps/web"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
