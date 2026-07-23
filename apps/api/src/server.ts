@@ -1,3 +1,4 @@
+import "./polyfills";
 import { createServer } from "http";
 import { createApp } from "@/app";
 import { env } from "@/config/env";
@@ -41,3 +42,4 @@ bootstrap().catch((err) => {
   logger.error({ err }, "Fatal error during bootstrap");
   process.exit(1);
 });
+
