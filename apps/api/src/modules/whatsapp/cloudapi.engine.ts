@@ -149,27 +149,42 @@ class CloudAPIWhatsAppEngine implements IWhatsAppEngine {
         waMessageId: messageId,
       };
     } catch (err) {
-      const errorMsg =
-        axios.isAxiosError(err) && err.response?.data?.error?.message
-          ? err.response.data.error.message
-          : err instanceof Error
-            ? err.message
-            : "Unknown error";
+      const axiosError = axios.isAxiosError(err);
+      const metaError = axiosError ? err.response?.data?.error : null;
+      const httpStatus = axiosError ? err.response?.status : undefined;
+      const metaErrorCode = metaError?.code || metaError?.error_subcode;
+      const metaErrorType = metaError?.type;
+      const metaErrorMessage = metaError?.message || (err instanceof Error ? err.message : "Unknown error");
+
+      // Build detailed error message with all Meta error fields visible
+      const errorDetails = [
+        `httpStatus=${httpStatus}`,
+        metaErrorCode ? `metaErrorCode=${metaErrorCode}` : null,
+        metaErrorType ? `metaErrorType=${metaErrorType}` : null,
+        `metaErrorMessage="${metaErrorMessage}"`,
+        metaError ? `fullMetaError=${JSON.stringify(metaError)}` : null,
+      ].filter(Boolean).join(" | ");
+
+      const logMessage = `Failed to send WhatsApp message to ${input.to} (template=${input.templateName}): ${errorDetails}`;
 
       logger.error(
         {
-          err,
+          err: err instanceof Error ? err.message : String(err),
           userId: input.userId,
           to: input.to,
           templateName: input.templateName,
-          errorDetail: axios.isAxiosError(err) ? err.response?.data : undefined,
+          httpStatus,
+          metaErrorCode,
+          metaErrorType,
+          metaErrorMessage,
+          fullMetaError: axiosError ? JSON.stringify(err.response?.data) : undefined,
         },
-        "Failed to send WhatsApp message via Cloud API"
+        logMessage
       );
 
       return {
         success: false,
-        error: `Cloud API error: ${errorMsg}`,
+        error: `Cloud API error: ${metaErrorMessage}`,
       };
     }
   }
