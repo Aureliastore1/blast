@@ -155,18 +155,25 @@ class CloudAPIWhatsAppEngine implements IWhatsAppEngine {
         metaError?.message ||
         (err instanceof Error ? err.message : "Unknown error");
 
-      // Log full details including Meta error response
-      logger.error({
-        err: err instanceof Error ? err.message : String(err),
-        userId: input.userId,
-        to: input.to,
-        templateName: input.templateName,
+      // Build detailed error message with all Meta error info for logging
+      const errorDetails = {
         httpStatus: axiosError ? err.response?.status : undefined,
         metaErrorCode: metaError?.code || metaError?.error_subcode,
         metaErrorType: metaError?.type,
         metaErrorMessage: metaError?.message,
         fullMetaError: axiosError ? JSON.stringify(err.response?.data) : undefined,
-      }, `Failed to send WhatsApp message: ${errorMsg}`);
+        templateName: input.templateName,
+        to: input.to,
+        userId: input.userId,
+      };
+
+      // Log full details including all error fields in message for visibility
+      const detailedErrorMsg = `Failed to send WhatsApp message: ${errorMsg} | HTTP: ${errorDetails.httpStatus}, Code: ${errorDetails.metaErrorCode}, Type: ${errorDetails.metaErrorType}, FullMeta: ${errorDetails.fullMetaError}`;
+      
+      logger.error({
+        err: err instanceof Error ? err.message : String(err),
+        ...errorDetails,
+      }, detailedErrorMsg);
 
       return {
         success: false,
