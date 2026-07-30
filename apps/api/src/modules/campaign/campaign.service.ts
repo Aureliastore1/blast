@@ -142,8 +142,8 @@ export async function startCampaign(userId: string, id: string) {
     campaign.mediaFile && campaign.mediaFile.type !== "NONE" ? campaign.mediaFile.type : undefined;
 
   // Template mode: use WhatsApp template for new contacts (cold outreach)
-  // For now, default template is "bag" (Indonesian marketing template)
-  const templateName = "bag";
+  // For now, default template is "bags_kece" (custom Indonesian marketing template)
+  const templateName = "bags_kece";
   const templateLanguage = "id";
   const templateParams: Record<string, string> = {};
 
