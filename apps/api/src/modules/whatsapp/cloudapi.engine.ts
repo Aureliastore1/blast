@@ -149,23 +149,24 @@ class CloudAPIWhatsAppEngine implements IWhatsAppEngine {
         waMessageId: messageId,
       };
     } catch (err) {
+      const axiosError = axios.isAxiosError(err);
+      const metaError = axiosError ? err.response?.data?.error : null;
       const errorMsg =
-        axios.isAxiosError(err) && err.response?.data?.error?.message
-          ? err.response.data.error.message
-          : err instanceof Error
-            ? err.message
-            : "Unknown error";
+        metaError?.message ||
+        (err instanceof Error ? err.message : "Unknown error");
 
-      logger.error(
-        {
-          err,
-          userId: input.userId,
-          to: input.to,
-          templateName: input.templateName,
-          errorDetail: axios.isAxiosError(err) ? err.response?.data : undefined,
-        },
-        "Failed to send WhatsApp message via Cloud API"
-      );
+      // Log full details including Meta error response
+      logger.error({
+        err: err instanceof Error ? err.message : String(err),
+        userId: input.userId,
+        to: input.to,
+        templateName: input.templateName,
+        httpStatus: axiosError ? err.response?.status : undefined,
+        metaErrorCode: metaError?.code || metaError?.error_subcode,
+        metaErrorType: metaError?.type,
+        metaErrorMessage: metaError?.message,
+        fullMetaError: axiosError ? JSON.stringify(err.response?.data) : undefined,
+      }, `Failed to send WhatsApp message: ${errorMsg}`);
 
       return {
         success: false,
